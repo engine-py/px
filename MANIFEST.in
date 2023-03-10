@@ -1,0 +1,2 @@
+include example.txt
+exclude tests/debug.log
