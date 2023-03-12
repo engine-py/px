@@ -55,12 +55,26 @@ async def dispatch(request_line, headers, body):
         },
         'body': 'Hello, World!',
     }
+
+async def filter_response(response):
+    # process the response
+    # ...
+
+    # return a response
+    return {
+        'status': '200 OK',
+        'headers': {
+            'Content-Type': 'text/plain',
+        },
+        'body': 'Hello, World!',
+    }
 ```
 
 The process_request_module is a custom module that defines three functions for processing an HTTP request:
 filter_request_line(), filter_headers(), and dispatch().
 
-The filter_request_line() function takes in the request line as a string parameter and returns a dictionary 
+The filter_request_line() function takes in the request line as a tuple parameter (method, path, version) 
+and returns a dictionary 
 that contains the HTTP response status, headers, and body. This function is responsible for filtering 
 and processing the request line and returning an appropriate response.
 
@@ -76,10 +90,12 @@ and returning an appropriate response.
 All three functions should return a dictionary with the following keys:
 
 * status: The HTTP response status code and reason phrase, e.g. "200 OK".
-* headers: A dictionary of HTTP response headers, where the keys are the header names and the values are the header values.
+* headers: A dictionary of HTTP response headers, 
+where the keys are the header names and the values are the header values.
 * body: The HTTP response body, which can be a string or bytes object.
 
-By defining these three functions in your process_request_module, you can customize the processing of incoming HTTP requests to your server.
+By defining these three functions in your process_request_module, 
+you can customize the processing of incoming HTTP requests to your server.
 
 ## Testing
 

@@ -4,57 +4,107 @@
 
 import asyncio
 
+def parse_http_request_line(request_line_bytes):
+    line_str = request_line_bytes.decode('utf-8').strip()
+    parts = line_str.split()
 
-async def handle_request(reader, writer, dispatch):
+    if len(parts) != 3:
+        raise ValueError("Invalid HTTP request line")
+        
+    method, path, version = parts
+    return (method, path, version)
+
+
+def parse_http_headers(headers_bytes):
+    headers = {}
+    lines = headers_bytes.decode().split(b'\r\n')
+    for line in lines:
+        if not line:
+            continue
+        key, value = line.split(': ', 1)
+        headers[key] = value
+    return headers
+
+
+async def handle_request(reader, writer, process_module):
     # Initialize a buffer to store any leftover data from the previous request
     leftover_data = b''
+    request_line = None
+    headers = None
+    body = None
 
     while True:
-        # Read the incoming request data
-        request_data = await reader.read()
-
-        # If there is no data, the client has closed the connection, so we exit the loop
+        request_data = await reader.read(1024)
         if not request_data:
             break
-
-        # Prepend any leftover data from the previous request
         request_data = leftover_data + request_data
 
-        # Process the request data and split it into separate requests
-        requests = []
-        while request_data:
-            # Check if there is a complete request in the data
-            content_length = None
-            if b'Content-Length: ' in request_data:
-                index = request_data.find(b'Content-Length: ') + len(b'Content-Length: ')
-                content_length = int(request_data[index:request_data.find(b'\r\n', index)])
-
-            if content_length is None:
-                # If there is no Content-Length header,
-                # we assume there is only one request in the data
-                requests.append(request_data)
-                request_data = b''
+        if request_line is None:
+            request_line_end_index = request_data.find(b'\r\n')
+            if request_line_end_index == -1:
+                leftover_data = request_data
+                continue
             else:
-                # Extract the next complete request from the data
-                end_index = request_data.find(b'\r\n\r\n', content_length) + len(b'\r\n\r\n')
-                if end_index == -1:
+                try:
+                    request_line = parse_http_request_line(request_data[:request_line_end_index])
+                    request_data = request_data[request_line_end_index + 2: ]
+                    res = process_module.filter_request_line(request_line)
+                except Exception as ex:
+                    logger.error('Error with request line')
                     break
-                requests.append(request_data[:end_index])
-                request_data = request_data[end_index:]
+                else:
+                    if not res is None:
+                        response = generate_response(res)
+                        writer.write(response)
+                        await writer.drain()
+                        break
 
-        # If the last request is incomplete, store the leftover data for the next request
-        if request_data:
-            leftover_data = request_data
+        if request_line is not None and headers is None:
+            headers_end_index = request_data.find(b'\r\n\r\n')
+            if headers_end_index == -1:
+                leftover_data = request_data
+                continue
+            else:
+                headers_bytes = request_data[:headers_end_index]
+                headers = parse_http_headers(headers_bytes)
+                request_data = request_data[headers_end_index + 4: ]
+                try:
+                    res = process_module.filter_headers(headers)
+                except Exception as ex:
+                    break
+                else:
+                    if not res is None:
+                        response = generate_response(res)
+                        writer.write(response)
+                        await writer.drain()
+                        break
 
-        # Process each request using the dispatch function
-        for req in requests:
-            response = generate_response(dispatch(req))
-            writer.write(response)
+        if headers is not None and body is None:
+            content_length = headers.get('content_length', None)
+            
+            if content_length is None:
+                body = request_data
+            else:
+                if len(request_data) < content_length:
+                    leftover_data = request_data
+                    continue
+                else:
+                    content_length = int(content_length)
+                    body = request_data[:content_length]
+                    request_data = request_data[content_length:]
+                    try:
+                        res = process_module.dispatch(request_line, headers, body)
+                        request_line = None
+                        headers = None
+                        body = None
+                    except Exception as ex:
+                        break
+                    else:
+                        if not res is None:
+                            response = generate_response(res)
+                            writer.write(response)
+                            await writer.drain()
 
-            # Drain the writer to make sure all data is sent before continuing
-            await writer.drain()
-
-    # Close the connection to the client
     writer.close()
 
 
