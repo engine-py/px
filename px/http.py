@@ -29,7 +29,7 @@ def parse_http_headers(headers_bytes):
     @return: a dictionary containing the HTTP headers 
     """
     headers = {}
-    lines = headers_bytes.decode().split(b'\r\n')
+    lines = headers_bytes.decode().split('\r\n')
     for line in lines:
         if not line:
             continue

@@ -3,6 +3,7 @@
 # BoBoBo
 
 import asyncio
+from typing import Tuple
 from .http import parse_http_request_line, parse_http_headers, generate_response
 
 

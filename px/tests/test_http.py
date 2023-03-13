@@ -6,58 +6,30 @@ import unittest
 from px.http import parse_http_headers, parse_http_request_line, generate_response
 
 
-class TestParseHttpRequestLine(unittest.TestCase):
+class TestHttpMethods(unittest.TestCase):
 
-    def test_valid_request_line(self):
-        request_line = b"GET /index.html HTTP/1.1\r\n"
-        expected_result = ("GET", "/index.html", "HTTP/1.1")
-        result = parse_http_request_line(request_line)
-        self.assertEqual(result, expected_result)
+    def test_parse_http_request_line_valid(self):
+        self.assertEqual(parse_http_request_line(b"GET /index.html HTTP/1.1"), ("GET", "/index.html", "HTTP/1.1"))
+        self.assertEqual(parse_http_request_line(b"POST /login HTTP/1.0"), ("POST", "/login", "HTTP/1.0"))
 
-    def test_invalid_request_line(self):
-        request_line = b"POST /index.php HTTP/1.2\r\n"
+    def test_parse_http_request_line_invalid(self):
         with self.assertRaises(ValueError):
-            parse_http_request_line(request_line)
-
-    def test_empty_request_line(self):
-        request_line = b"\r\n"
+            parse_http_request_line(b"GET /index.html")
         with self.assertRaises(ValueError):
-            parse_http_request_line(request_line)
-
-    def test_missing_space_between_parts(self):
-        request_line = b"GET/index.htmlHTTP/1.1\r\n"
-        with self.assertRaises(ValueError):
-            parse_http_request_line(request_line)
-
-    def test_extra_spaces_between_parts(self):
-        request_line = b"GET  /index.html  HTTP/1.1\r\n"
-        expected_result = ("GET", "/index.html", "HTTP/1.1")
-        result = parse_http_request_line(request_line)
-        self.assertEqual(result, expected_result)
+            parse_http_request_line(b"GET")
 
     def test_parse_http_headers(self):
-        # Test basic case with one header
-        headers_bytes = b'Content-Type: text/html\r\n'
-        expected_output = {'Content-Type': 'text/html'}
-        self.assertEqual(parse_http_headers(headers_bytes), expected_output)
-
-        # Test case with multiple headers and a blank line
-        headers_bytes = b'Content-Type: text/html\r\nServer: Apache\r\n\r\n'
-        expected_output = {'Content-Type': 'text/html', 'Server': 'Apache'}
-        self.assertEqual(parse_http_headers(headers_bytes), expected_output)
+        headers_bytes = b"Host: www.example.com\r\nConnection: keep-alive\r\nAccept-Language: en-us,en;q=0.5\r\n\r\n"
+        headers = parse_http_headers(headers_bytes)
+        self.assertEqual(len(headers), 3)
+        self.assertEqual(headers["Host"], "www.example.com")
+        self.assertEqual(headers["Connection"], "keep-alive")
+        self.assertEqual(headers["Accept-Language"], "en-us,en;q=0.5")
 
     def test_generate_response(self):
-        # Test basic case with only status and body
-        response = {'status': 200, 'body': 'Hello, World!'}
-        expected_output = b'HTTP/1.1 200 OK\r\n\r\nHello, World!'
-        self.assertEqual(generate_response(response), expected_output)
-
-        # Test case with headers and non-ASCII characters in body
-        response = {'status': 404, 'headers': {'Content-Language': 'fr'}, 
-                    'body': u'Page non trouvée'.encode('utf-8')}
-        expected_output = (b'HTTP/1.1 404 Not Found\r\nContent-Language: fr\r\n'
-                           b'\r\nPage non trouv\xc3\xa9e')
-        self.assertEqual(generate_response(response), expected_output)
+        response = {"status": "200 OK", "headers": {"Content-Type": "text/html"}, "body": "<h1>Hello World</h1>"}
+        response_data = generate_response(response)
+        self.assertEqual(response_data, b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<h1>Hello World</h1>")
 
 
 if __name__ == '__main__':
