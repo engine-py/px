@@ -1,6 +1,7 @@
 # Px Server
 
 Async HTTP Server in Python, and it`s functional.
+And it supports WSGI.
 
 ## Usage
 
@@ -71,23 +72,27 @@ async def filter_response(response):
 ```
 
 The process_request_module is a custom module that defines three functions for processing an HTTP request:
-filter_request_line(), filter_headers(), and dispatch().
+filter_request_line(), filter_headers(), filter_response and dispatch().
 
-The filter_request_line() function takes in the request line as a tuple parameter (method, path, version) 
+* The filter_request_line() function takes in the request line as a tuple parameter (method, path, version) 
 and returns a dictionary 
 that contains the HTTP response status, headers, and body. This function is responsible for filtering 
 and processing the request line and returning an appropriate response.
 
-The filter_headers() function takes in the HTTP headers as a dictionary parameter and returns a dictionary 
+* The filter_headers() function takes in the HTTP headers as a dictionary parameter and returns a dictionary 
 that contains the HTTP response status, headers, and body. This function is responsible for filtering 
 and processing the HTTP headers and returning an appropriate response.
 
-The dispatch() function takes in the request line, headers, and body as parameters and returns a dictionary 
+* The filter_response() function takes in the response that will return
+to clients. Before they are returned to clients, you can custom your
+response filter here.
+
+* The dispatch() function takes in the request line, headers, and body as parameters and returns a dictionary 
 that contains the HTTP response status, headers, and body. This function is responsible for dispatching 
 the HTTP request to the appropriate handler based on the request method and URI path, processing the request, 
 and returning an appropriate response.
 
-All three functions should return a dictionary with the following keys:
+All four functions should return a dictionary with the following keys:
 
 * status: The HTTP response status code and reason phrase, e.g. "200 OK".
 * headers: A dictionary of HTTP response headers, 

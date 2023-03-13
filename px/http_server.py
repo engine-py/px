@@ -3,118 +3,103 @@
 # BoBoBo
 
 import asyncio
-
-def parse_http_request_line(request_line_bytes):
-    line_str = request_line_bytes.decode('utf-8').strip()
-    parts = line_str.split()
-
-    if len(parts) != 3:
-        raise ValueError("Invalid HTTP request line")
-        
-    method, path, version = parts
-    return (method, path, version)
+from .http import parse_http_request_line, parse_http_headers, generate_response
 
 
-def parse_http_headers(headers_bytes):
-    headers = {}
-    lines = headers_bytes.decode().split(b'\r\n')
-    for line in lines:
-        if not line:
-            continue
-        key, value = line.split(': ', 1)
-        headers[key] = value
-    return headers
+async def filter_and_send_response(resp, writer, process_module):
+    """Filter response using process_module and send it to client.
+
+    Args:
+        response: The response to filter.
+        writer: The StreamWriter to send the response to.
+        process_module: The module containing the filter_response function.
+
+    Returns:
+        None
+    """
+    filtered_resp = process_module.filter_response(resp)
+    response = generate_response(filtered_resp)
+    writer.write(encoded_response)
+    await writer.drain()
+
+
+async def read_until(
+    read_buffer: bytes,
+    reader: asyncio.StreamReader,
+    until_bytes: bytes
+) -> Tuple[bytes, bytes]:
+    """
+    Read bytes by reader, until reach the until_bytes.
+    Parameter read_buffer is used for caching bytes between multi-reads.
+    """
+    if not read_buffer:
+        read_buffer = b''
+
+    while True:
+        data = await reader.read(1024)
+
+        if not data:
+            # End of stream reached, return whatever we've got so far
+            return (b'', read_buffer)
+
+        read_buffer += data
+
+        end_index = read_buffer.find(until_bytes)
+        if end_index != -1:
+            # Found the delimiter, return the message and remaining buffer
+            return (read_buffer[:end_index], read_buffer[end_index+len(until_bytes):])
 
 
 async def handle_request(reader, writer, process_module):
-    # Initialize a buffer to store any leftover data from the previous request
-    leftover_data = b''
+    """
+    Parse HTTP request bytes to request line, headers and body.
+    Filter by request line and headers.
+    Dispatch with http request.
+    And filter response before return to client.
+    """
     request_line = None
-    headers = None
+    headers = {}
     body = None
 
+    read_buffer = b''
     while True:
-        request_data = await reader.read(1024)
-        if not request_data:
+        request_line_bytes, read_buffer = await read_until(read_buffer, reader, b'\r\n')
+        request_line = parse_http_request_line(request_line_bytes)
+        resp = process_module.filter_request_line(request_line)
+        if resp:
+            await filter_and_send_response(resp, writer, process_module)
             break
-        request_data = leftover_data + request_data
 
-        if request_line is None:
-            request_line_end_index = request_data.find(b'\r\n')
-            if request_line_end_index == -1:
-                leftover_data = request_data
-                continue
-            else:
-                try:
-                    request_line = parse_http_request_line(request_data[:request_line_end_index])
-                    request_data = request_data[request_line_end_index + 2: ]
-                    res = process_module.filter_request_line(request_line)
-                except Exception as ex:
-                    logger.error('Error with request line')
-                    break
-                else:
-                    if not res is None:
-                        response = generate_response(res)
-                        writer.write(response)
-                        await writer.drain()
-                        break
+        headers_bytes, read_buffer = await read_until(read_buffer, reader, b'\r\n\r\n')
+        headers = parse_http_headers(headers_bytes)
+        resp = process_module.filter_headers(headers)
+        if resp:
+            await filter_and_send_response(resp, writer, process_module)
+            break
 
-        if request_line is not None and headers is None:
-            headers_end_index = request_data.find(b'\r\n\r\n')
-            if headers_end_index == -1:
-                leftover_data = request_data
-                continue
-            else:
-                headers_bytes = request_data[:headers_end_index]
-                headers = parse_http_headers(headers_bytes)
-                request_data = request_data[headers_end_index + 4: ]
-                try:
-                    res = process_module.filter_headers(headers)
-                except Exception as ex:
-                    break
-                else:
-                    if not res is None:
-                        response = generate_response(res)
-                        writer.write(response)
-                        await writer.drain()
-                        break
-
-        if headers is not None and body is None:
-            content_length = headers.get('content_length', None)
+        content_length = headers.get('content_length', None)
             
+        while True:
             if content_length is None:
-                body = request_data
+                body = read_buffer
             else:
-                if len(request_data) < content_length:
-                    leftover_data = request_data
+                if len(read_buffer) < content_length:
+                    data = await reader.read(1024)
+                    if not data:
+                        writer.close()
+                        return
+                    read_buffer = read_buffer + data
                     continue
                 else:
                     content_length = int(content_length)
-                    body = request_data[:content_length]
-                    request_data = request_data[content_length:]
-                    try:
-                        res = process_module.dispatch(request_line, headers, body)
-                        request_line = None
-                        headers = None
-                        body = None
-                    except Exception as ex:
-                        break
-                    else:
-                        if not res is None:
-                            response = generate_response(res)
-                            writer.write(response)
-                            await writer.drain()
+                    body = read_buffer[:content_length]
+
+            resp = process_module.dispatch(request_line, headers, body)
+            if resp:
+                await filter_and_send_response(resp, writer, process_module)
+                break
 
     writer.close()
-
-
-def generate_response(response):
-    status_line = f'HTTP/1.1 {response["status"]}\r\n'
-    header_lines = [f'{k}: {v}\r\n' for k, v in response['headers'].items()]
-    headers = ''.join(header_lines)
-    body = response['body'] if isinstance(response['body'], bytes) else response['body'].encode()
-    response_data = f'{status_line}{headers}\r\n{body.decode()}'.encode()
-    return response_data
 
 
 async def run_server(dispatch, host, port):
