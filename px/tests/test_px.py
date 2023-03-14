@@ -4,7 +4,8 @@
 
 import unittest
 import asyncio
-import http.client
+import http
+from unittest.mock import patch
 from px.main import main
 
 
@@ -19,9 +20,10 @@ class PxServerTest(unittest.TestCase):
     def tearDown(self):
         self.loop.close()
 
-    def test_server_start_with_defaults(self):
-        server_task = asyncio.ensure_future(main)
-        self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
+    def test_with_defaults(self):
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port)]):
+            main()
+            self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
         conn = http.client.HTTPConnection(self.host, port=8080)
         conn.request('GET', '/')
@@ -30,9 +32,6 @@ class PxServerTest(unittest.TestCase):
         self.assertEqual(response.reason, 'OK')
         self.assertEqual(response.getheader('Content-Type'), 'text/plain')
         self.assertEqual(response.read(), b'Hello, world!')
-
-        server_task.cancel()
-        self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_custom_host_and_port(self):
         with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port)]):

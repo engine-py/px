@@ -2,6 +2,8 @@
 
 # BoBoBo
 
+import importlib
+
 
 PxContext = {}
 
@@ -22,17 +24,17 @@ def get_wsgi_app(app):
     return PxContext['wsgi_app']
 
 
-def create_default_process_module():
+def setup_default_process_module():
     from .example import process_module_example as m
     setup_process_module(m)
 
 
-def create_http_process_module(process_request_module):
+def setup_http_process_module(process_request_module):
     module = importlib.import_module(process_request_module)
     setup_process_module(module)
 
 
-def create_wsgi_process_module(wsgi_app_module):
+def setup_wsgi_process_module(wsgi_app_module):
     app_m = importlib.import_module(wsgi_app_module)
     if not hasattr(app_m, 'wsgi_app'):
         raise ValueError('Module %s does not have a wsgi_app function.' % wsgi_app_module)
