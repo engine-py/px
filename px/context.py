@@ -2,16 +2,21 @@
 
 # BoBoBo
 
+
 PxContext = {}
+
 
 def get_process_module():
     return PxContext['process_module']
 
+
 def setup_process_module(m):
     PxContext['process_module'] = m
 
+
 def put_wsgi_app(app):
     PxContext['wsgi_app'] = app
+
 
 def get_wsgi_app(app):
     return PxContext['wsgi_app']

@@ -13,16 +13,17 @@ class PxServerTest(unittest.TestCase):
     def setUp(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(None)
+        self.host = '127.0.0.1'
+        self.port = 8888
 
     def tearDown(self):
         self.loop.close()
 
     def test_server_start_with_defaults(self):
-        app = server.PxApp()
-        server_task = asyncio.ensure_future(app.start_server())
+        server_task = asyncio.ensure_future(main)
         self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
-        conn = http.client.HTTPConnection('localhost', port=8080)
+        conn = http.client.HTTPConnection(self.host, port=8080)
         conn.request('GET', '/')
         response = conn.getresponse()
         self.assertEqual(response.status, 200)
@@ -34,11 +35,11 @@ class PxServerTest(unittest.TestCase):
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_custom_host_and_port(self):
-        app = server.PxApp(host='127.0.0.1', port=8888)
-        server_task = asyncio.ensure_future(app.start_server())
-        self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port)]):
+            server_task = asyncio.ensure_future(main)
+            self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
-        conn = http.client.HTTPConnection('127.0.0.1', port=8888)
+        conn = http.client.HTTPConnection(self.host, port=self.port)
         conn.request('GET', '/')
         response = conn.getresponse()
         self.assertEqual(response.status, 200)
@@ -50,9 +51,9 @@ class PxServerTest(unittest.TestCase):
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_static_resource_dir(self):
-        app = server.PxApp(static_dir='static')
-        server_task = asyncio.ensure_future(app.start_server())
-        self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port), '--static-resource', self.static_dir]):
+            server_task = asyncio.ensure_future(main)
+            self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
         conn = http.client.HTTPConnection('localhost', port=8080)
         conn.request('GET', '/static/test.txt')
@@ -66,9 +67,9 @@ class PxServerTest(unittest.TestCase):
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_wsgi_app_module(self):
-        app = server.PxApp(wsgi_app='tests.test_wsgi_app')
-        server_task = asyncio.ensure_future(app.start_server())
-        self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port), '--wsgi', self.wsgi_app_module]):
+            server_task = asyncio.ensure_future(main)
+            self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
         conn = http.client.HTTPConnection('localhost', port=8080)
         conn.request('GET', '/?name=John')
