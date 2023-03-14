@@ -56,7 +56,8 @@ class PxServerTest(unittest.TestCase):
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_static_resource_dir(self):
-        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port), '--static-resource', self.static_dir]):
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port),
+                                '--static-resource', self.static_dir]):
             server_task = asyncio.ensure_future(main)
             self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
@@ -72,7 +73,8 @@ class PxServerTest(unittest.TestCase):
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
     def test_server_start_with_wsgi_app_module(self):
-        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port), '--wsgi', self.wsgi_app_module]):
+        with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port),
+                                '--wsgi', self.wsgi_app_module]):
             server_task = asyncio.ensure_future(main)
             self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
 
@@ -87,9 +89,6 @@ class PxServerTest(unittest.TestCase):
         server_task.cancel()
         self.loop.run_until_complete(server_task)  # wait for server to stop
 
-
-if __name__ == '__main__':
-    unittest.main()
 
 if __name__ == '__main__':
     unittest.main()
