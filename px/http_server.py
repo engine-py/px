@@ -103,15 +103,14 @@ async def handle_request(reader, writer, process_module):
     writer.close()
 
 
-async def run_server(dispatch, host, port):
+async def run_server(host, port, process_module):
     # Create the server
-    server = await asyncio.start_server(lambda r, w: handle_request(r, w, dispatch),
-                                        host=host, port=port)
+    server = await asyncio.start_server(lambda r, w: handle_request(r, w, process_module), host=host, port=port)
 
     # Keep the server running
     async with server:
         await server.serve_forever()
 
 
-def start(dispatch, host='127.0.0.1', port=8080):
-    asyncio.run(run_server(dispatch, host, port))
+def start(host='127.0.0.1', port=8080, process_module=None):
+    asyncio.run(run_server(host, port, process_module))

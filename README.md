@@ -8,13 +8,13 @@ And it supports WSGI.
 To start the server, use the following command:
 
 ```
-python -m px -h <host> -p <port> -m <process_request_module> -d <static_resource_dir>
+python -m px -H <host> -P <port>  --static-resouce <static_resource_dir> --http <request_process_module>
 ```
 
 By default, the server listens on localhost:8080. 
-You can specify a custom module to handle HTTP requests with the process_request_module argument.
 The static_resource_dir argument defines the root path of the static resource directory.
 
+You can specify a custom module to handle HTTP requests with the request_process_module argument.
 Here is an example of a custom HTTP request processing module:
 
 ```
@@ -60,18 +60,13 @@ async def dispatch(request_line, headers, body):
 async def filter_response(response):
     # process the response
     # ...
+    response['body'] = 'Hello, World! This is filtered'
 
     # return a response
-    return {
-        'status': '200 OK',
-        'headers': {
-            'Content-Type': 'text/plain',
-        },
-        'body': 'Hello, World!',
-    }
+    return response
 ```
 
-The process_request_module is a custom module that defines three functions for processing an HTTP request:
+The request_process_module is a custom module that defines three functions for processing an HTTP request:
 filter_request_line(), filter_headers(), filter_response and dispatch().
 
 * The filter_request_line() function takes in the request line as a tuple parameter (method, path, version) 
@@ -99,8 +94,41 @@ All four functions should return a dictionary with the following keys:
 where the keys are the header names and the values are the header values.
 * body: The HTTP response body, which can be a string or bytes object.
 
-By defining these three functions in your process_request_module, 
+By defining these three functions in your request_process_module, 
 you can customize the processing of incoming HTTP requests to your server.
+
+## WSGI
+
+The Px Server supports WSGI, which can be started using the following command:
+
+```
+python -m px -H <host> -P <port> --wsgi <wsgi_app_module>
+```
+
+To use a custom WSGI app module, simply specify the module with the wsgi_app_argument. Here is an example of a simple WSGI app module:
+
+```
+def wsgi_app():
+    # do some process, like building app context
+    # ...
+
+    def _app(environ, start_response):
+        """Simplest wsgi app."""
+        params = environ['QUERY_STRING']
+        status = '200 OK'
+        response_headers = [('Content-type', 'text/plain')]
+        start_response(status, response_headers)
+        return ['Hello World!\n'.encode('utf-8'),
+                ('QUERY_STRING:' + params).encode('utf-8')]
+
+    return _app
+```
+
+To use this module, it is important to have a function named wsgi_app within it, 
+which returns an WSGI app.
+
+Notice: The parameters --http and --wsgi are mutually exclusive, 
+meaning only one of them can be used at a time.
 
 ## Testing
 
