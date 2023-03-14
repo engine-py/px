@@ -35,8 +35,10 @@ def main():
 
     if args.request_process_module:
         pxctx.setup_request_process_module(args.request_process_module)
-    else:
+    elif args.wsgi_process_module:
         pxctx.setup_wsgi_process_module(args.wsgi_app_module)
+    else:
+        pxctx.setup_default_process_module()
 
     start(args.host, args.port, pxctx.get_process_module())
 

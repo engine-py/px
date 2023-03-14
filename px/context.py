@@ -16,6 +16,12 @@ def put_wsgi_app(app):
 def get_wsgi_app(app):
     return PxContext['wsgi_app']
 
+
+def create_default_process_module():
+    from .example import process_module_example as m
+    setup_process_module(m)
+
+
 def create_http_process_module(process_request_module):
     module = importlib.import_module(process_request_module)
     setup_process_module(module)
