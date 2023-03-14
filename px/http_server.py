@@ -20,7 +20,7 @@ async def filter_and_send_response(resp, writer, process_module):
     """
     filtered_resp = process_module.filter_response(resp)
     response = generate_response(filtered_resp)
-    writer.write(encoded_response)
+    writer.write(response)
     await writer.drain()
 
 
@@ -48,7 +48,7 @@ async def read_until(
         end_index = read_buffer.find(until_bytes)
         if end_index != -1:
             # Found the delimiter, return the message and remaining buffer
-            return (read_buffer[:end_index], read_buffer[end_index+len(until_bytes):])
+            return (read_buffer[:end_index], read_buffer[end_index + len(until_bytes):])
 
 
 async def handle_request(reader, writer, process_module):
@@ -79,7 +79,7 @@ async def handle_request(reader, writer, process_module):
             break
 
         content_length = headers.get('content_length', None)
-            
+
         while True:
             if content_length is None:
                 body = read_buffer
@@ -103,9 +103,13 @@ async def handle_request(reader, writer, process_module):
     writer.close()
 
 
+server = None
+
+
 async def run_server(host, port, process_module):
-    # Create the server
-    server = await asyncio.start_server(lambda r, w: handle_request(r, w, process_module), host=host, port=port)
+    global server
+    server = await asyncio.start_server(lambda r, w: handle_request(r, w, process_module),
+                                        host=host, port=port)
 
     # Keep the server running
     async with server:
@@ -114,3 +118,10 @@ async def run_server(host, port, process_module):
 
 def start(host='127.0.0.1', port=8080, process_module=None):
     asyncio.run(run_server(host, port, process_module))
+
+
+async def stop():
+    global server
+    server.close()
+    await server.wait_closed()
+    await asyncio.get_running_loop().shutdown_asyncgens()

@@ -3,7 +3,7 @@
 # BoBoBo
 
 import argparse
-from .http_server import start
+from .http_server import start, stop
 from . import context as pxctx
 
 
@@ -41,6 +41,10 @@ def main():
         pxctx.setup_default_process_module()
 
     start(args.host, args.port, pxctx.get_process_module())
+
+
+def stop_server():
+    stop()
 
 
 if __name__ == '__main__':

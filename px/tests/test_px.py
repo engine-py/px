@@ -5,8 +5,10 @@
 import unittest
 import asyncio
 import http
+import threading
+import time
 from unittest.mock import patch
-from px.main import main
+from px.main import main, stop_server
 
 
 class PxServerTest(unittest.TestCase):
@@ -22,8 +24,10 @@ class PxServerTest(unittest.TestCase):
 
     def test_with_defaults(self):
         with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port)]):
-            main()
-            self.loop.run_until_complete(asyncio.sleep(0.1))  # wait for server to start
+            thread = threading.Thread(target=main)
+            thread.start()
+
+        time.sleep(1)
 
         conn = http.client.HTTPConnection(self.host, port=8080)
         conn.request('GET', '/')
@@ -32,6 +36,8 @@ class PxServerTest(unittest.TestCase):
         self.assertEqual(response.reason, 'OK')
         self.assertEqual(response.getheader('Content-Type'), 'text/plain')
         self.assertEqual(response.read(), b'Hello, world!')
+
+        stop_server()
 
     def test_server_start_with_custom_host_and_port(self):
         with patch('sys.argv', ['px', '-H', self.host, '-P', str(self.port)]):
